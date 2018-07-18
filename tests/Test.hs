@@ -8,8 +8,7 @@ import qualified Level07Tests
 
 main :: IO ()
 main = do
-  putStrLn "No tests yet!"
-  -- Level03Tests.unitTests
+  Level03Tests.unitTests
   -- Level04Tests.unitTests
   -- Level05Tests.unitTests
   -- Level06Tests.unitTests

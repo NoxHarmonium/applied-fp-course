@@ -38,14 +38,22 @@ unitTests = do
           -- the request and also check for a 200 response code.
           get "/list" `shouldRespondWith` "List Request not implemented"
 
-      -- Write some more tests, below are some ideas to get you started:
+      describe "Add Route With Empty Topic" $ do
+        it "Should respond with an error when given an empty comment" $
+          post "/some_topic/add" "" `shouldRespondWith` "Empty Comment" {matchStatus = 400}
 
-      -- Don't worry if you don't get all of these done. :)
+      describe "Add Route With Valid Topic" $ do
+        it "Should return a 'Hello there!' message and 200 status" $
+          post "/some_topic/add" "comment-text" `shouldRespondWith` "Hello there!"
 
-      -- 1) The '<topic>/add' route will respond with an error when given an empty comment
-      -- 2) The '<topic>/view' route will respond correctly when given a topic
-      -- 3) The '<topic>/view' route will respond with an error when given an empty topic
-      -- 4) A gibberish route will return a 404
+      describe "View Route With Valid Topic" $ do
+        it "Should return a 'not implemented' message and 200 status" $
+          get "/some_topic/view" `shouldRespondWith` "View Request not implemented"
 
--- After you're done here, you'll need to uncomment the use of these functions
--- in the `test/Test.hs` otherwise the tests won't run!
+      describe "View Route With Empty Topic" $ do
+        it "Should return a 'Empty Topic' message and 400 status" $
+          get "//view" `shouldRespondWith` "Empty Topic" {matchStatus = 400}
+
+      describe "Gibberish Route" $ do
+        it "Should return a 'Unknown Route' message and 404 status" $
+          get "sdfdsfsddf" `shouldRespondWith` "Unknown Route" {matchStatus = 404}
