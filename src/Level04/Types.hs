@@ -20,8 +20,10 @@ import           GHC.Generics              (Generic)
 
 import           Data.ByteString           (ByteString)
 import           Data.Text                 (Text)
+import           Data.Char                 (isUpper)
 
 import           Data.List                 (stripPrefix)
+import           Data.List.Split           (splitWhen)
 import           Data.Maybe                (fromMaybe)
 
 import           Data.Aeson                (ToJSON (toJSON))
@@ -30,7 +32,7 @@ import qualified Data.Aeson.Types          as A
 
 import           Data.Time                 (UTCTime)
 
-import           Level04.DB.Types          (DBComment)
+import           Level04.DB.Types          (DBComment (..))
 
 -- Notice how we've moved these types into their own modules. It's cheap and
 -- easy to add modules to carve out components in a Haskell application. So
@@ -38,7 +40,7 @@ import           Level04.DB.Types          (DBComment)
 -- distinct functionality, or you want to carve out a particular piece of code,
 -- just spin up another module.
 import           Level04.Types.CommentText (CommentText, getCommentText, mkCommentText)
-import           Level04.Types.Error       (Error (EmptyCommentText, EmptyTopic, UnknownRoute))
+import           Level04.Types.Error       (Error (EmptyCommentText, EmptyTopic, UnknownRoute, DbError))
 import           Level04.Types.Topic       (Topic, getTopic, mkTopic)
 
 
@@ -71,8 +73,8 @@ data Comment = Comment
 modFieldLabel
   :: String
   -> String
-modFieldLabel =
-  error "modFieldLabel not implemented"
+modFieldLabel label =
+  last $ splitWhen isUpper label
 
 instance ToJSON Comment where
   -- This is one place where we can take advantage of our `Generic` instance.
@@ -97,9 +99,12 @@ instance ToJSON Comment where
 fromDbComment
   :: DBComment
   -> Either Error Comment
-fromDbComment =
-  error "fromDbComment not yet implemented"
-
+fromDbComment (DBComment id_ topic body time) =
+  do
+    topic' <- mkTopic topic
+    body' <- mkCommentText body
+    Right $ Comment (CommentId id_) topic' body' time
+    
 data RqType
   = AddRq Topic CommentText
   | ViewRq Topic

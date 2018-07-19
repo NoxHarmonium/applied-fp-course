@@ -124,6 +124,7 @@ library
                      , sqlite-simple-errors == 0.6.*
                      , semigroups == 0.18.*
                      , transformers >= 0.4 && < 0.6
+                     , split >=0.2 && <0.3
 
   -- Directories containing source files.
   hs-source-dirs:      src
@@ -153,6 +154,7 @@ test-suite app-fp-tests
                      , bytestring == 0.10.*
                      , text == 1.2.*
                      , mtl == 2.2.*
+                     , split >=0.2 && <0.3
 
 test-suite doctests
   -- Base language which the package is written in.
@@ -214,7 +216,7 @@ executable level04-exe
   -- Directories containing source files.
   hs-source-dirs:      exe
   -- Other library packages from which modules are imported.
-  build-depends:       base >=4.8 && <4.12
+  build-depends:       base  >=4.8 && <4.12
                      , applied-fp-course
   -- Base language which the package is written in.
   default-language:    Haskell2010

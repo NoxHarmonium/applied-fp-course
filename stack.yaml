@@ -5,3 +5,4 @@ extra-deps:
 - sqlite-simple-errors-0.6.1.0
 - text-1.2.3.0
 - th-abstraction-0.2.6.0
+- split-0.2.3.3

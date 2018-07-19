@@ -5,6 +5,8 @@ module Level04.Core
   , app
   ) where
 
+import qualified Data.Bifunctor                     as Bf
+
 import           Control.Applicative                (liftA2)
 import           Control.Monad                      (join)
 
@@ -24,18 +26,19 @@ import           Data.Either                        (Either (Left, Right),
                                                      either)
 
 import           Data.Semigroup                     ((<>))
+import           Data.String                        (fromString)
 import           Data.Text                          (Text)
-import           Data.Text.Encoding                 (decodeUtf8)
+import           Data.Text.Encoding                 (decodeUtf8, encodeUtf8)
 
 import           Data.Aeson                         (ToJSON)
 import qualified Data.Aeson                         as A
 
 import           Database.SQLite.SimpleErrors.Types (SQLiteResponse)
 
-import           Level04.Conf                       (Conf, firstAppConfig)
+import           Level04.Conf                       (Conf (..), firstAppConfig)
 import qualified Level04.DB                         as DB
 import           Level04.Types                      (ContentType (JSON, PlainText),
-                                                     Error (EmptyCommentText, EmptyTopic, UnknownRoute),
+                                                     Error (DbError, EmptyCommentText, EmptyTopic, UnknownRoute),
                                                      RqType (AddRq, ListRq, ViewRq),
                                                      mkCommentText, mkTopic,
                                                      renderContentType)
@@ -47,8 +50,16 @@ data StartUpError
   = DbInitErr SQLiteResponse
   deriving Show
 
+mapDbError :: Either SQLiteResponse a -> Either StartUpError a
+mapDbError dbResult = Bf.first DbInitErr dbResult
+
 runApp :: IO ()
-runApp = error "runApp needs re-implementing"
+runApp =
+  do
+    dbInitResult <- prepareAppReqs
+    case dbInitResult of
+      Left err -> error (show err)
+      Right db -> run 3000 (app db)
 
 -- We need to complete the following steps to prepare our app requirements:
 --
@@ -60,7 +71,10 @@ runApp = error "runApp needs re-implementing"
 prepareAppReqs
   :: IO ( Either StartUpError DB.FirstAppDB )
 prepareAppReqs =
-  error "prepareAppReqs not implemented"
+  do
+    initResult <- DB.initDB dbFilePath
+    return $ mapDbError initResult
+  where (Conf dbFilePath) = firstAppConfig
 
 -- | Some helper functions to make our lives a little more DRY.
 mkResponse
@@ -128,12 +142,17 @@ handleRequest
   :: DB.FirstAppDB
   -> RqType
   -> IO (Either Error Response)
-handleRequest _db (AddRq _ _) =
-  (resp200 PlainText "Success" <$) <$> error "AddRq handler not implemented"
-handleRequest _db (ViewRq _)  =
-  error "ViewRq handler not implemented"
+handleRequest _db (AddRq topic commentText) =
+  (resp200 PlainText "Success" <$) <$>
+    (DB.addCommentToTopic _db topic commentText)
+handleRequest _db (ViewRq topic)  =
+  do
+    dbResult <- (DB.getComments _db topic)
+    return (resp200Json <$> dbResult)
 handleRequest _db ListRq      =
-  error "ListRq handler not implemented"
+  do
+    dbResult <- (DB.getTopics _db)
+    return (resp200Json <$> dbResult)
 
 mkRequest
   :: Request
@@ -177,3 +196,5 @@ mkErrorResponse EmptyCommentText =
   resp400 PlainText "Empty Comment"
 mkErrorResponse EmptyTopic =
   resp400 PlainText "Empty Topic"
+mkErrorResponse (DbError sqliteResponse) =
+  resp400 PlainText ("Database error: " <> (fromString . show $ sqliteResponse))
