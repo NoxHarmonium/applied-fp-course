@@ -6,7 +6,9 @@ module Level05.Core
   , prepareAppReqs
   ) where
 
+import           Control.Monad.Except               (MonadError (..))
 import           Control.Monad.IO.Class             (liftIO)
+import qualified Data.Bifunctor                     as Bf
 
 import           Network.Wai                        (Application, Request,
                                                      Response, pathInfo,
@@ -32,6 +34,7 @@ import           Data.Aeson                         (ToJSON)
 import qualified Data.Aeson                         as A
 
 import           Level05.AppM                       (AppM, liftEither, runAppM)
+import           Level05.Conf                       (Conf (..))
 import qualified Level05.Conf                       as Conf
 import qualified Level05.DB                         as DB
 import           Level05.Types                      (ContentType (..),
@@ -47,14 +50,18 @@ data StartUpError
   = DbInitErr SQLiteResponse
   deriving Show
 
+
+mapDbError :: Either SQLiteResponse a -> Either StartUpError a
+mapDbError dbResult = Bf.first DbInitErr dbResult
+
 runApp :: IO ()
 runApp = do
   -- Load our configuration
   cfgE <- prepareAppReqs
   -- Loading the configuration can fail, so we have to take that into account now.
   case cfgE of
-    Left err   -> undefined
-    Right _cfg -> run undefined undefined
+    Left err   -> error $ show err
+    Right _cfg -> run 3000 (app _cfg)
 
 -- We need to complete the following steps to prepare our app requirements:
 --
@@ -66,7 +73,10 @@ runApp = do
 prepareAppReqs
   :: IO ( Either StartUpError DB.FirstAppDB )
 prepareAppReqs =
-  error "copy your prepareAppReqs from the previous level."
+  do
+    initResult <- DB.initDB dbFilePath'
+    return $ mapDbError initResult
+  where (Conf dbFilePath') = Conf.firstAppConfig
 
 -- | Some helper functions to make our lives a little more DRY.
 mkResponse
@@ -115,11 +125,17 @@ resp200Json =
 
 -- How has this implementation changed, now that we have an AppM to handle the
 -- errors for our application? Could it be simplified? Can it be changed at all?
+--  Request -> (Response -> IO ResponseReceived) -> IO ResponseReceived
 app
   :: DB.FirstAppDB
   -> Application
 app db rq cb =
-  error "app not reimplemented"
+  let
+    request = mkRequest rq
+    response =  request >>= handleRequest db
+    cb' = cb . either mkErrorResponse id
+  in
+    (runAppM response) >>= cb'
 
 handleRequest
   :: DB.FirstAppDB

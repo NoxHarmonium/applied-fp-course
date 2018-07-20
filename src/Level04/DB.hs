@@ -127,7 +127,7 @@ getTopics (FirstAppDB conn) =
     sql = "SELECT DISTINCT topic FROM comments"
   in
     do
-      dbResult <- Sql.runDBAction (query_ conn sql :: IO [Sql.Only Text])
+      dbResult <- Sql.runDBAction (query_ conn sql)
       let resultWithTransformedError = mapDbError dbResult
       return (resultWithTransformedError >>= traverse (mkTopic . Sql.fromOnly))
 

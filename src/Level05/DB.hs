@@ -10,6 +10,7 @@ module Level05.DB
   ) where
 
 import           Control.Monad.IO.Class             (liftIO)
+import qualified Data.Bifunctor                     as Bf
 
 import           Data.Text                          (Text)
 import qualified Data.Text                          as Text
@@ -18,7 +19,9 @@ import           Data.Bifunctor                     (first)
 import           Data.Time                          (getCurrentTime)
 
 import           Database.SQLite.Simple             (Connection,
-                                                     Query (fromQuery))
+                                                     Query (Query, fromQuery),
+                                                     close, execute, execute_,
+                                                     open, query, query_)
 import qualified Database.SQLite.Simple             as Sql
 
 import qualified Database.SQLite.SimpleErrors       as Sql
@@ -30,7 +33,7 @@ import           Level05.Types                      (Comment, CommentText,
                                                      getCommentText, getTopic,
                                                      mkTopic)
 
-import           Level05.AppM                       (AppM)
+import           Level05.AppM                       (AppM (..), liftEither)
 
 -- We have a data type to simplify passing around the information we need to run
 -- our database queries. This also allows things to change over time without
@@ -65,37 +68,64 @@ initDB fp = Sql.runDBAction $ do
     createTableQ =
       "CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY, topic TEXT, comment TEXT, time INTEGER)"
 
+mapDbError :: Sql.DatabaseResponse a -> Either Error a
+mapDbError dbResult = Bf.first DBError dbResult
+
 runDB
   :: (a -> Either Error b)
   -> IO a
   -> AppM b
-runDB =
-  error "Write 'runDB' to match the type signature"
+runDB f q =
+  AppM $ (>>= f) <$> mapDbError <$> Sql.runDBAction q
 
 getComments
   :: FirstAppDB
   -> Topic
   -> AppM [Comment]
-getComments =
-  error "Copy your completed 'getComments' and refactor to match the new type signature"
+getComments (FirstAppDB conn) topic =
+ let
+    sql = "SELECT id,topic,comment,time FROM comments WHERE topic = ?"
+    topic' = getTopic topic
+    query' = query conn sql (Sql.Only topic')
+    transform = traverse fromDbComment
+  in
+    runDB transform query'
 
 addCommentToTopic
   :: FirstAppDB
   -> Topic
   -> CommentText
   -> AppM ()
-addCommentToTopic =
-  error "Copy your completed 'appCommentToTopic' and refactor to match the new type signature"
+addCommentToTopic (FirstAppDB conn) topic commentText =
+  let
+    sql = "INSERT INTO comments (topic,comment,time) VALUES (?,?,?)"
+    topic' = getTopic topic
+    commentText' = getCommentText commentText
+    query' = getCurrentTime >>= \time -> (execute conn sql (topic', commentText', time))
+    transform = pure
+  in
+    runDB transform query'
 
 getTopics
   :: FirstAppDB
   -> AppM [Topic]
-getTopics =
-  error "Copy your completed 'getTopics' and refactor to match the new type signature"
+getTopics (FirstAppDB conn) =
+  let
+    sql = "SELECT DISTINCT topic FROM comments"
+    query' = query_ conn sql
+    transform = traverse $ mkTopic . Sql.fromOnly
+  in
+    runDB transform query'
 
 deleteTopic
   :: FirstAppDB
   -> Topic
   -> AppM ()
-deleteTopic =
-  error "Copy your completed 'deleteTopic' and refactor to match the new type signature"
+deleteTopic (FirstAppDB conn) topic =
+  let
+    sql = "DELETE FROM comments WHERE topic = ?"
+    topic' = getTopic topic
+    query' = execute conn sql (Sql.Only topic')
+    transform = pure
+  in
+    runDB transform query'
